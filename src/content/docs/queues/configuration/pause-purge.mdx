@@ -1,0 +1,32 @@
+---
+title: Pause delivery
+pcx_content_type: concept
+sidebar:
+  order: 2
+---
+import { WranglerConfig, Type, MetaInfo } from "~/components";
+
+
+You can pause delivery of messages from your Queue to any connected consumers. Pausing a queue is useful to manage downtime (such as if your consumer Worker is unhealthy), without losing any messages.
+
+Queues continue to receive and store messages even while delivery is paused. Messages in a paused queue are still subject to expiry, if the messages become older than the queue message retention period.
+
+Pausing affects both [push-based consumer Workers](/queues/reference/how-queues-works#consumers), and [pull based consumers](/queues/configuration/pull-consumers).
+
+### Pause and resume delivery using Wrangler
+The following command will pause message delivery from your queue:
+```sh
+$ npx run wrangler queues pause-delivery <QUEUE-NAME>
+```
+- `queue-name` <Type text="string" /> <MetaInfo text="required" />
+  - The name of the queue which delivery should be paused.
+
+The following command will resume message delivery:
+```sh
+$ npx run wrangler queues resume-delivery <QUEUE-NAME>
+```
+- `queue-name` <Type text="string" /> <MetaInfo text="required" />
+  - The name of the queue from which delivery should be resumed.
+
+### Using HTTP Pull consumers with a paused queue
+When a queue is paused, messages cannot be pulled by an [HTTP pull based consumer](/queues/configuration/pull-consumers). Requests to pull messages will receive a `409` response, along with an error message stating `queue_delivery_paused`.
