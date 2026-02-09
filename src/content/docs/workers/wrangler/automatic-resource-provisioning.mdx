@@ -1,0 +1,95 @@
+---
+pcx_content_type: concept
+title: Automatically provision Cloudflare resources when deploying a Worker with Wrangler (Beta)
+description: When you deploy a Worker that binds to a Cloudflare resource, Wrangler will automatically detect and create any resources that do not exist on your account. 
+sidebar:
+  badge:
+    text: Beta
+---
+
+import { PackageManagers, WranglerConfig } from "~/components";
+
+You can now automatically provision Cloudflare resources as part of your deployment.  You no longer need to manually run separate commands to create resources that do not yet exist on your account prior to deploying.  
+
+With resource provisioning, if your Wrangler configuration file includes a [KV namespace](/kv/), [D1 database](/d1/), or [R2 bucket](/r2/) that does not yet exist, Wrangler will detect and create these resources upon deployment. This is done by adding the experimental `-–x-provision` flag to your commands. 
+
+## Wrangler Configuration 
+You can set up your Wrangler configuration file like the following:
+
+<WranglerConfig>
+```json
+{
+  "kv_namespaces": [
+    {
+      "binding": "MY_KV"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MY_R2"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "MY_D1"
+    }
+  ]
+}
+```
+</WranglerConfig>
+
+When using the experimental `-–x-provision` flag, the `id` field for KV and D1 and the `bucket_name` for R2 are optional in your wrangler configuration. 
+
+## Developing locally and deploying
+When developing locally, you can interact with local versions of any KV, D1, R2 resources configured in your Wrangler configuration file by running:
+
+<PackageManagers
+	type="exec"
+	pkg="wrangler"
+	args={"dev –-x-provision"}
+/>
+
+When you're ready to deploy, run: 
+
+<PackageManagers
+	type="exec"
+	pkg="wrangler"
+	args={"deploy –-x-provision"}
+/>
+
+Upon deploy, Wrangler will automatically create the resources that do not yet exist on your account and bind them to your Worker. Each newly created resource will be named with the format `<worker-name>-<binding-name>` by default.  
+
+```bash
+$ wrangler deploy --x-provision
+ ⛅️ wrangler 3.109.0
+--------------------
+
+Total Upload: 0.29 KiB / gzip: 0.22 KiB
+
+The following bindings need to be provisioned:
+- KV Namespaces:
+  - MY_KV 
+- D1 Databases:
+  - MY_D1 
+- R2 Buckets:
+  - MY_R2 
+
+...
+
+🎉 All resources provisioned, continuing with deployment...
+
+Your worker has access to the following bindings:
+- KV Namespaces:
+  - MY_KV: ...
+- D1 Databases:
+  - MY_D1: ...
+- R2 Buckets:
+  - MY_R2: ...
+Uploaded my-worker
+Deployed my-worker triggers
+  https://my-worker.workers.dev
+Current Version ID: ...
+```
+
+## Feedback 
+Resource provisiong is currently in beta. Drop us a note in the [Cloudflare Developers Discord](https://discord.cloudflare.com/) in the [Wrangler channel](https://discord.com/channels/595317990191398933/799437470004412476) and tell us what you think. 
