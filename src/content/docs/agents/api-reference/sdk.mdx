@@ -1,0 +1,532 @@
+---
+title: The Agent API
+pcx_content_type: concept
+sidebar:
+  order: 1
+
+---
+
+import { MetaInfo, Render, Type, TypeScriptExample, WranglerConfig } from "~/components";
+
+This page provides an overview of the Agent SDK API, including the `Agent` class, methods and properties built-in to the `agents-sdk`.
+
+An Agent is a JavaScript class that extends the `Agent` class from the `agents-sdk` package. An Agent encapsulates all of the logic for an Agent, including how clients can connect to it, how it stores state, the methods it exposes, and any error handling.
+
+<TypeScriptExample>
+
+```ts
+import { Agent } from "agents-sdk";
+
+class MyAgent extends Agent {
+	// Define methods on the Agent
+}
+
+export default MyAgent;
+```
+
+</TypeScriptExample>
+
+An Agent can have many (millions of) instances: each instance is a separate micro-server that runs independently of the others. This allows Agents to scale horizontally: an Agent can be associated with a single user, or many thousands of users, depending on the agent you're building.
+
+Instances of an Agent are addressed by a unique identifier: that identifier (ID) can be the user ID, an email address, GitHub username, a flight ticket number, an invoice ID, or any other identifier that helps to uniquely identify the instance and for whom it is acting on behalf of.
+
+### Agent
+
+Writing an Agent requires you to define a class that extends the `Agent` class from the `agents-sdk` package. An Agent encapsulates all of the logic for an Agent, including how clients can connect to it, how it stores state, the methods it exposes, and any error handling.
+
+You can also define your own methods on an Agent: it's technically valid to publish an Agent only has your own methods exposed, and create/get Agents directly from a Worker.
+
+Your own methods can access the Agent's environment variables and bindings on `this.env`, state on `this.setState`, and call other methods on the Agent via `this.yourMethodName`.
+
+```ts
+import { Agent } from "agents-sdk";
+
+interface Env {
+	// Define environment variables & bindings here
+}
+
+// Pass the Env as a TypeScript type argument
+// Any services connected to your Agent or Worker as Bindings
+// are then available on this.env.<BINDING_NAME>
+
+// The core class for creating Agents that can maintain state, orchestrate
+// complex AI workflows, schedule tasks, and interact with users and other
+// Agents.
+class MyAgent extends Agent<Env, State> {
+  // Optional initial state definition
+  initialState = {
+    counter: 0,
+    messages: [],
+    lastUpdated: null
+  };
+
+  // Called when a new Agent instance starts or wakes from hibernation
+  async onStart() {
+    console.log('Agent started with state:', this.state);
+  }
+
+  // Handle HTTP requests coming to this Agent instance
+  // Returns a Response object
+  async onRequest(request: Request): Promise<Response> {
+    return new Response("Hello from Agent!");
+  }
+
+  // Called when a WebSocket connection is established
+  // Access the original request via ctx.request for auth etc.
+  async onConnect(connection: Connection, ctx: ConnectionContext) {
+    // Authenticate the connection
+    // Access the Request on ctx.request to inspect headers, cookies and the URL
+
+    // Accept the connection
+    connection.accept();
+  }
+
+  // Called for each message received on a WebSocket connection
+  // Message can be string, ArrayBuffer, or ArrayBufferView
+  async onMessage(connection: Connection, message: WSMessage) {
+    // Handle incoming messages
+    connection.send("Received your message");
+  }
+
+  // Handle WebSocket connection errors
+  async onError(connection: Connection, error: unknown): Promise<void> {
+    console.error(`Connection error:`, error);
+  }
+
+  // Handle WebSocket connection close events
+  async onClose(connection: Connection, code: number, reason: string, wasClean: boolean): Promise<void> {
+    console.log(`Connection closed: ${code} - ${reason}`);
+  }
+
+  // Called when the Agent's state is updated from any source
+  // source can be "server" or a client Connection
+  onStateUpdate(state: State, source: "server" | Connection) {
+    console.log("State updated:", state, "Source:", source);
+  }
+
+  // You can define your own custom methods to be called by requests,
+  // WebSocket messages, or scheduled tasks
+  async customProcessingMethod(data: any) {
+    // Process data, update state, schedule tasks, etc.
+    this.setState({ ...this.state, lastUpdated: new Date() });
+  }
+}
+```
+
+### WebSocket connection Handling
+
+#### Connection
+
+Represents a WebSocket connection to an Agent.
+
+```ts
+// WebSocket connection interface
+interface Connection<State = unknown> {
+  // Unique ID for this connection
+  id: string;
+
+  // Client-specific state attached to this connection
+  state: State;
+
+  // Update the connection's state
+  setState(state: State): void;
+
+  // Accept an incoming WebSocket connection
+  accept(): void;
+
+  // Close the WebSocket connection with optional code and reason
+  close(code?: number, reason?: string): void;
+
+  // Send a message to the client
+  // Can be string, ArrayBuffer, or ArrayBufferView
+  send(message: string | ArrayBuffer | ArrayBufferView): void;
+}
+```
+
+#### WSMessage
+
+Types of messages that can be received from a WebSocket.
+
+```ts
+// Types of messages that can be received from WebSockets
+type WSMessage = string | ArrayBuffer | ArrayBufferView;
+```
+
+#### ConnectionContext
+
+Context information for a WebSocket connection.
+
+```ts
+// Context available during WebSocket connection
+interface ConnectionContext {
+  // The original HTTP request that initiated the WebSocket connection
+  request: Request;
+}
+```
+
+### State Management
+
+#### State Management
+
+Methods and types for managing Agent state.
+
+```ts
+// State management in the Agent class
+class Agent<Env, State = unknown> {
+  // Initial state that will be set if no state exists yet
+  initialState: State = {} as unknown as State;
+
+  // Current state of the Agent, persisted across restarts
+  get state(): State;
+
+  // Update the Agent's state
+  // Persists to storage and notifies all connected clients
+  setState(state: State): void;
+
+  // Called when state is updated from any source
+  // Override to react to state changes
+  onStateUpdate(state: State, source: "server" | Connection): void;
+}
+```
+
+```ts
+// Example usage:
+this.setState({
+  ...this.state,
+  counter: this.state.counter + 1,
+});
+```
+
+### Scheduling
+
+#### Scheduling Tasks
+
+Schedule tasks to run at a specified time in the future.
+
+```ts
+// Scheduling API for running tasks in the future
+class Agent<Env, State = unknown> {
+  // Schedule a task to run in the future
+  // when: seconds from now, specific Date, or cron expression
+  // callback: method name on the Agent to call
+  // payload: data to pass to the callback
+  // Returns a Schedule object with the task ID
+  async schedule<T = any>(
+    when: Date | string | number,
+    callback: keyof this,
+    payload?: T
+  ): Promise<Schedule<T>>;
+
+  // Get a scheduled task by ID
+  // Returns undefined if the task doesn't exist
+  async getSchedule<T = any>(id: string): Promise<Schedule<T> | undefined>;
+
+  // Get all scheduled tasks matching the criteria
+  // Returns an array of Schedule objects
+  getSchedules<T = any>(criteria?: {
+    description?: string;
+    id?: string;
+    type?: "scheduled" | "delayed" | "cron";
+    timeRange?: { start?: Date; end?: Date };
+  }): Schedule<T>[];
+
+  // Cancel a scheduled task by ID
+  // Returns true if the task was cancelled, false otherwise
+  async cancelSchedule(id: string): Promise<boolean>;
+}
+```
+
+#### Schedule object
+
+Represents a scheduled task.
+
+```ts
+// Represents a scheduled task
+type Schedule<T = any> = {
+  // Unique identifier for the schedule
+  id: string;
+  // Name of the method to be called
+  callback: string;
+  // Data to be passed to the callback
+  payload: T;
+} & (
+  | {
+      // One-time execution at a specific time
+      type: "scheduled";
+      // Timestamp when the task should execute
+      time: number;
+    }
+  | {
+      // Delayed execution after a certain time
+      type: "delayed";
+      // Timestamp when the task should execute
+      time: number;
+      // Number of seconds to delay execution
+      delayInSeconds: number;
+    }
+  | {
+      // Recurring execution based on cron expression
+      type: "cron";
+      // Timestamp for the next execution
+      time: number;
+      // Cron expression defining the schedule
+      cron: string;
+    }
+);
+```
+
+```ts
+// Schedule a task that calls a method after a delay
+let task = await this.schedule(300, "methodToCall", { message: "data-to-send-to-method" });
+```
+
+### SQL Database Access
+
+#### SQL Query API
+
+Execute SQL queries against the Agent's built-in SQLite database using the `this.sql` method within any method on your `Agent` class.
+
+```ts
+// SQL query API for the Agent's embedded database
+class Agent<Env, State = unknown> {
+  // Execute a SQL query with tagged template literals
+  // Returns an array of rows matching the query
+  sql<T = Record<string, any>>(
+    strings: TemplateStringsArray,
+    ...values: any[]
+  ): T[];
+}
+```
+
+```ts
+// Example usage
+let user = this.sql<YourUserType>`
+  SELECT * FROM users WHERE id = ${userId}`;
+```
+
+Visit the documentation on [storing and syncing state](/agents/api-reference/store-and-sync-state/) to learn more about the `this.setState` and `this.sql` APIs.
+
+### Client API
+
+#### AgentClient
+
+Client for connecting to an Agent from the browser.
+
+```ts
+import { AgentClient } from "agents-sdk/client";
+
+// Options for creating an AgentClient
+type AgentClientOptions = {
+  // Name of the agent to connect to (class name in kebab-case)
+  agent: string;
+  // Name of the specific Agent instance (optional, defaults to "default")
+  name?: string;
+  // Other WebSocket options like host, protocol, etc.
+};
+
+// WebSocket client for connecting to an Agent
+class AgentClient extends WebSocket {
+  constructor(opts: AgentClientOptions);
+
+  // Add event listeners for "message", "open", "close", "error" events
+  addEventListener(type: string, listener: EventListener): void;
+
+  // Send a message to the Agent
+  send(message: string | ArrayBufferLike | Blob | ArrayBufferView): void;
+}
+```
+
+#### agentFetch
+
+Make an HTTP request to an Agent.
+
+```ts
+import { agentFetch } from "agents-sdk/client";
+
+// Options for the agentFetch function
+type AgentClientFetchOptions = {
+  // Name of the agent to connect to
+  agent: string;
+  // Name of the specific Agent instance (optional)
+  name?: string;
+};
+
+// Make an HTTP request to an Agent
+// Returns a Promise resolving to a Response
+function agentFetch(
+  opts: AgentClientFetchOptions,
+  init?: RequestInit
+): Promise<Response>;
+```
+
+### React Integration
+
+The `agents-sdk` provides a React API for simplifying connection and routing to Agents from front-end frameworks, including React Router (Remix), Next.js, and Astro.
+
+#### useAgent
+
+React hook for connecting to an Agent.
+
+```ts
+import { useAgent } from "agents-sdk/react";
+
+// Options for the useAgent hook
+type UseAgentOptions<State = unknown> = {
+  // Name of the agent to connect to
+  agent: string;
+  // Name of the specific Agent instance (optional)
+  name?: string;
+  // Called when the Agent's state is updated
+  onStateUpdate?: (state: State, source: "server" | "client") => void;
+  // Standard WebSocket event handlers
+  onMessage?: (event: MessageEvent) => void;
+  onOpen?: (event: Event) => void;
+  onClose?: (event: CloseEvent) => void;
+  onError?: (event: Event) => void;
+};
+
+// React hook for connecting to an Agent
+// Returns a WebSocket connection with setState method
+function useAgent<State = unknown>(
+  options: UseAgentOptions<State>
+): WebSocket & {
+  // Update the Agent's state
+  setState: (state: State) => void
+};
+```
+
+### Chat Agent
+
+The `agents-sdk` exposes an `AIChatAgent` class that extends the `Agent` class and exposes an `onChatMessage` method that simplifies building interactive chat agents.
+
+You can combine this with the `useAgentChat` React hook from the `agents-sdk/ai-react` package to manage chat state and messages between a user and your Agent(s).
+
+#### AIChatAgent
+
+Extension of the `Agent` class with built-in chat capabilities.
+
+```ts
+import { AIChatAgent } from "agents-sdk/ai-chat-agent";
+import { Message, StreamTextOnFinishCallback } from "ai";
+
+// Base class for chat-specific agents
+class AIChatAgent<Env = unknown> extends Agent<Env> {
+  // Array of chat messages for the current conversation
+  messages: Message[];
+
+  // Handle incoming chat messages and generate a response
+  // onFinish is called when the response is complete
+  async onChatMessage(
+    onFinish: StreamTextOnFinishCallback<any>
+  ): Promise<Response | undefined>;
+
+  // Persist messages within the Agent's local storage.
+  async saveMessages(messages: Message[]): Promise<void>;
+}
+```
+
+### AI React Hooks
+
+#### useAgentChat
+
+React hook for building AI chat interfaces using an Agent.
+
+```ts
+import { useAgentChat } from "agents-sdk/ai-react";
+import { useAgent } from "agents-sdk/react";
+import type { Message } from "ai";
+
+// Options for the useAgentChat hook
+type UseAgentChatOptions = {
+  // Agent connection from useAgent
+  agent: ReturnType<typeof useAgent>;
+  // Initial messages for the chat
+  initialMessages?: Message[];
+  // Maximum number of back-and-forth interactions
+  maxSteps?: number;
+  // Other options from standard chat hooks (temperature, etc.)
+};
+
+// React hook for building AI chat interfaces using an Agent
+function useAgentChat(options: UseAgentChatOptions): {
+  // Current chat messages
+  messages: Message[];
+  // User input state
+  input: string;
+  // Handle input changes
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  // Submit the current input
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  // Clear chat history on both client and Agent
+  clearHistory: () => void;
+  // Update messages and sync with Agent
+  setMessages: (messages: Message[]) => void;
+  // Other properties like isLoading, error, etc.
+};
+```
+
+:::note
+
+To learn more about how to manage state within an Agent, refer to the documentation on [managing and syncing state](/agents/api-reference/store-and-sync-state/).
+
+:::
+
+## Routing to Agents
+
+You can create and run an instance of an Agent directly from a Worker in one of three ways:
+
+1. Using the `routeAgentRequest` helper: this will automatically map requests to an individual Agent based on the `/agents/:agent/:name` URL pattern. The value of `:agent` will be the name of your Agent class converted to `kebab-case`, and the value of `:name` will be the name of the Agent instance you want to create or retrieve.
+2. Calling `getAgentByName`, which will create a new Agent instance if none exists by that name, or retrieve a handle to an existing instance.
+3. The [Durable Objects stub API](/durable-objects/api/id/), which provides a lower level API for creating and retrieving Agents.
+
+These three patterns are shown below: we recommend using either `routeAgentRequest` or `getAgentByName`, which help avoid some boilerplate.
+
+<TypeScriptExample>
+
+```ts
+import { Agent, AgentNamespace, getAgentByName, routeAgentRequest } from 'agents-sdk';
+
+interface Env {
+	// Define your Agent on the environment here
+	// Passing your Agent class as a TypeScript type parameter allows you to call
+	// methods defined on your Agent.
+	MyAgent: AgentNamespace<MyAgent>;
+}
+
+export default {
+	async fetch(request, env, ctx): Promise<Response> {
+		// Routed addressing
+		// Automatically routes HTTP requests and/or WebSocket connections to /agents/:agent/:name
+		// Best for: connecting React apps directly to Agents using useAgent from agents-sdk/react
+		(await routeAgentRequest(request, env)) || Response.json({ msg: 'no agent here' }, { status: 404 });
+
+		// Named addressing
+		// Best for: convenience method for creating or retrieving an agent by name/ID.
+		let namedAgent = getAgentByName<Env, MyAgent>(env.MyAgent, 'my-unique-agent-id');
+		// Pass the incoming request straight to your Agent
+		let namedResp = (await namedAgent).fetch(request);
+
+		// Durable Objects-style addressing
+		// Best for: controlling ID generation, associating IDs with your existing systems,
+		// and customizing when/how an Agent is created or invoked
+		const id = env.MyAgent.newUniqueId();
+		const agent = env.MyAgent.get(id);
+		// Pass the incoming request straight to your Agent
+		let resp = await agent.fetch(request);
+
+		return Response.json({ hello: 'visit https://developers.cloudflare.com/agents for more' });
+	},
+} satisfies ExportedHandler<Env>;
+
+export class MyAgent extends Agent<Env> {
+	// Your Agent implementation goes here
+}
+```
+</TypeScriptExample>
+
+
+### Next steps
+
+* [Build a chat Agent](/agents/getting-started/build-a-chat-agent/) using the `agents-sdk` and deploy it to Workers.
+* Learn more [using WebSockets](/agents/api-reference/websockets/) to build interactive Agents and stream data back from your Agent.
+* [Orchestrate asynchronous workflows](/agents/api-reference/run-workflows) from your Agent by combining the `agents-sdk` and [Workflows](/workflows).
