@@ -1,0 +1,87 @@
+---
+title: Workers Overview
+type: overview
+pcx_content_type: overview
+sidebar:
+  order: 1
+head:
+  - tag: title
+    content: Cloudflare Workers
+---
+
+import {
+	PackageManagers,
+	Description,
+	LinkButton,
+	Plan,
+	AstroIcon,
+	Tabs,
+	TabItem,
+	CardGrid,
+	LinkTitleCard,
+} from "~/components";
+
+Cloudflare Workers gives you a fast, scalable way to build serverless **full-stack applications**, running on Cloudflare's **global edge** network for **low-latency** performance. Use your language and framework of choice, built-in CDN caching, globally distributed storage, and serverless AI inference to build and scale effortlessly without managing infrastructure.
+
+<Plan type="all" />
+
+<Tabs>
+<TabItem label="Dashboard">
+<LinkButton variant="primary" href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create">
+	Workers dashboard
+</LinkButton>
+...continue with the [dashboard getting started guide](/workers/get-started/dashboard/)
+</TabItem>
+<TabItem label="CLI">
+<PackageManagers
+	type="create"
+	pkg="cloudflare@latest"
+	args={"my-first-worker"}
+/>
+...continue with the [CLI getting started guide](/workers/get-started/guide/)
+</TabItem>
+</Tabs>
+
+## Explore the possibilities
+
+* Simple deployment with streamlined configuration
+* Supports both stateful and stateless applications
+* Multi-language compatibility, including JavaScript, TypeScript, Python, and Rust
+* Works with popular full-stack [frameworks](/workers/frameworks/)
+* Connects to [data stores](/workers/databases/connecting-to-databases/) with [smart placement](/workers/configuration/smart-placement/) for fast startup and high performance
+* Built-in support for [cron jobs](/workers/configuration/cron-triggers/), [workflows](/workflows/), and [queues](/queues/)
+* [Pricing](/workers/platform/pricing/) that's affordable at any scale
+
+Integrations via [Bindings](/workers/runtime-apis/bindings/) let you connect to external services like databases, APIs, and storage, enabling functionality with a few lines of code:
+| Storage | Compute | Media |
+|----------|----------|----------|
+| <AstroIcon name="durable-objects"/> [Durable Objects](/durable-objects) <br /> Scalable stateful storage for real-time coordination. | <AstroIcon name="vectorize"/> [Vectorize](/vectorize)  <br /> Vector database for AI-powered semantic search.| <AstroIcon name="cache"/> [Cache / CDN](/cache)  <br /> Global caching for high-performance, low-latency delivery. |
+| <AstroIcon name="d1"/> [D1](/d1) <br /> Serverless SQL database built for fast, global queries.  | <AstroIcon name="zaraz"/> [Zaraz](/zaraz) <br /> Privacy-friendly third-party script loading at the edge.  | <AstroIcon name="hyperdrive"/> [Hyperdrive](/hyperdrive) <br /> Accelerate database queries by caching at the edge. |
+| <AstroIcon name="kv"/> [KV](/kv) <br /> Low-latency key-value storage for fast, edge-cached reads. |   |
+| <AstroIcon name="r2"/> [R2](/r2) <br /> Zero-egress object storage for cost-efficient data access. |  |
+
+## See Workers in action
+<CardGrid>
+
+<LinkTitleCard title="Example: Using the Cache API" href="/workers/examples/cache-api/">
+Use the Cache API to store responses in Cloudflare's cache.
+</LinkTitleCard>
+
+<LinkTitleCard title="Example: Setting Chron Triggers" href="/workers/examples/cron-trigger/">
+Set a Cron Trigger for your Worker.
+</LinkTitleCard>
+
+<LinkTitleCard title="Tutorial: Build an Image Generator with Workers AI" href="/workers-ai/tutorials/image-generation-playground/">
+In this series of videos, Kristian Freeman builds an AI Image Playground.
+</LinkTitleCard>
+
+<LinkTitleCard title="Tutorial: Workers Observability" href="/workers/observability/logs/#video-tutorial">
+Learn how to collect, store, and analyze logs in the Cloudflare dashboard.
+</LinkTitleCard>
+
+</CardGrid>
+
+[More tutorials](/workers/tutorials/)
+[More examples](/workers/examples/)
+
+[Join our Discord](https://discord.com/invite/cloudflaredev)
